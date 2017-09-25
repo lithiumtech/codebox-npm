@@ -27,9 +27,16 @@ provider:
 
     clientId: ${env:CODEBOX_INSIGHTS_CLIENT_ID}
     secret: ${env:CODEBOX_INSIGHTS_SECRET}
+  vpc:
+    securityGroupIds:
+      - Ref: lambdaSecurityGroup
+    subnetIds: !GetAtt subnets.SubnetIds
   iamRoleStatements:
     - Effect: "Allow"
       Action:
+        - "ec2:CreateNetworkInterface"
+        - "ec2:DescribeNetworkInterfaces"
+        - "ec2:DeleteNetworkInterface"
         - "s3:ListBucket"
         - "s3:GetObject"
         - "s3:PutObject"
@@ -130,6 +137,27 @@ functions:
 
 resources:
   Resources:
+    vpcId:
+      Type: Custom::Vpc
+      Properties:
+        ServiceToken: { 'Fn::ImportValue': LookupFunctionDev }
+        Name: ${opt:stage}
+    subnets:
+      Type: Custom::SubnetIds
+      Properties:
+        ServiceToken: { 'Fn::ImportValues': LookupFunctionDev }
+        Name: private-*
+        VpcId: ${vpcId}   
+    LambdaSecurityGroup:
+      Type: AWS::EC2::SecurityGroup
+      Properties:
+        GroupDescription: "npm-registry-access"
+        VpcId: ${vpcId}
+        SecurityGroupIngress:
+          - IpProtocol: tcp
+            FromPort: '0'
+            ToPort: '65535'
+            CidrIp: 0.0.0.0/0
     PackageStorage:
       Type: AWS::S3::Bucket
       Properties:
