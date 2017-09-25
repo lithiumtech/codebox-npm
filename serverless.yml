@@ -8,7 +8,7 @@ plugins:
   - codebox-tools
   - set-api-host
 
-service: codebox-npm
+service: npm-registry-dev
 
 provider:
   name: aws
@@ -27,6 +27,10 @@ provider:
 
     clientId: ${env:CODEBOX_INSIGHTS_CLIENT_ID}
     secret: ${env:CODEBOX_INSIGHTS_SECRET}
+  vpc:
+    securityGroupIds:
+      - Ref: LambdaSecurityGroup
+    subnetIds: {"Fn::GetAtt": [ Subnets, SubnetIds ] }
   iamRoleStatements:
     - Effect: "Allow"
       Action:
@@ -130,6 +134,27 @@ functions:
 
 resources:
   Resources:
+    VpcId:
+      Type: Custom::Vpc
+      Properties:
+        ServiceToken: { 'Fn::ImportValue': LookupFunctionDev }
+        Name: ${opt:stage}
+    Subnets:
+      Type: Custom::SubnetIds
+      Properties:
+        ServiceToken: { 'Fn::ImportValue': LookupFunctionDev }
+        Name: private-*
+        VpcId: { 'Ref': VpcId }   
+    LambdaSecurityGroup:
+      Type: AWS::EC2::SecurityGroup
+      Properties:
+        GroupDescription: "npm-registry-access"
+        VpcId: { 'Ref': VpcId }
+        SecurityGroupIngress:
+          - IpProtocol: tcp
+            FromPort: '0'
+            ToPort: '65535'
+            CidrIp: 0.0.0.0/0
     PackageStorage:
       Type: AWS::S3::Bucket
       Properties:
